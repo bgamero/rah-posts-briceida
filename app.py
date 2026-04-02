@@ -13,8 +13,10 @@ formato = st.sidebar.radio("¿Qué quieres crear hoy?", ["Post (Cuadrado)", "Sto
 if formato == "Post (Cuadrado)":
     archivo_plantilla = "plantilla.png"
     size_final = (1080, 1080)
+    # COORDENADAS ORIGINALES DEL POST QUE FUNCIONABAN
     coord_principal = (0, 0)
-    # Coordenadas de las 4 fotos pequeñas (Post)
+    size_principal = (720, 720) # Para que encaje en el marco del post
+    # Coordenadas de las 4 fotos pequeñas (Post) - APROXIMADAS (pueden requerir ajuste)
     coords_internas = [(725, 50), (725, 305), (725, 555), (725, 810)] 
     size_internas = (310, 240)
     cant_internas = 4
@@ -25,8 +27,10 @@ if formato == "Post (Cuadrado)":
 else:
     archivo_plantilla = "story.png"
     size_final = (1080, 1920)
+    # COORDENADAS PARA LA HISTORIA (Vertical)
     coord_principal = (0, 350)
-    # Coordenadas de las 3 fotos pequeñas (Story)
+    size_principal = (1080, 950)
+    # Coordenadas de las 3 fotos pequeñas (Story) - APROXIMADAS (pueden requerir ajuste)
     coords_internas = [(65, 1680), (395, 1680), (725, 1680)]
     size_internas = (290, 200)
     cant_internas = 3
@@ -40,8 +44,11 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("🖼️ Fotos")
-    foto_fachada = st.file_uploader("Foto Principal (Fachada)", type=["jpg", "png", "jpeg"])
+    foto_fachada = st.file_uploader("1. Foto de Fachada (Principal)", type=["jpg", "png", "jpeg"])
+    
+    # Nuevo: Subir fotos internas
     fotos_in = []
+    st.write(f"Sube las {cant_internas} fotos internas:")
     for i in range(cant_internas):
         fotos_in.append(st.file_uploader(f"Foto Interna {i+1}", type=["jpg", "png", "jpeg"], key=f"in_{i}"))
 
@@ -55,30 +62,27 @@ with col2:
     ban = c1.text_input("Baños", "2")
     est = c2.text_input("Puestos", "2")
 
+# --- GENERACIÓN ---
 if st.button(f"🚀 GENERAR {formato.upper()}"):
     if foto_fachada:
-        # Cargar base
-        base = Image.open(archivo_plantilla).convert("RGBA")
+        # Cargar base y crear lienzo limpio
         final = Image.new("RGBA", size_final, (255, 255, 255, 255))
         
-        # 1. Pegar Fachada
-        fachada = Image.open(foto_fachada).convert("RGBA")
-        if formato == "Post (Cuadrado)":
-            fachada = fachada.resize((720, 720))
-        else:
-            fachada = fachada.resize((1080, 950))
+        # 1. Pegar Fachada (como imagen principal)
+        fachada = Image.open(foto_fachada).convert("RGBA").resize(size_principal)
         final.paste(fachada, coord_principal, fachada)
         
-        # 2. Pegar Fotos Internas
+        # 2. Pegar Fotos Internas (con transparencia)
         for i in range(cant_internas):
             if fotos_in[i]:
                 img_temp = Image.open(fotos_in[i]).convert("RGBA").resize(size_internas)
                 final.paste(img_temp, coords_internas[i], img_temp)
         
-        # 3. Pegar Plantilla (encima de las fotos)
-        final.paste(base, (0, 0), base)
+        # 3. Pegar Plantilla (encima de las fotos, con transparencia activada)
+        base = Image.open(archivo_plantilla).convert("RGBA")
+        final.paste(base, (0, 0), mask=base) # ¡Aquí estaba el error! `mask=base` es clave.
         
-        # 4. Textos
+        # 4. Textos (igual que antes)
         draw = ImageDraw.Draw(final)
         try:
             f_bold = ImageFont.truetype("Montserrat-Bold.ttf", 60)
@@ -94,9 +98,12 @@ if st.button(f"🚀 GENERAR {formato.upper()}"):
         for i, texto in enumerate(detalles):
             draw.text(coords_iconos[i], texto, font=f_detalles, fill="white", anchor="mm")
             
-        st.image(final)
+        # Mostrar resultado
+        st.image(final, caption=f"¡Tu {formato} está listo!")
+        
+        # Guardar para descarga
         final.convert("RGB").save("resultado.jpg")
         with open("resultado.jpg", "rb") as f:
-            st.download_button("📥 Descargar", f, f"{formato}.jpg", "image/jpeg")
+            st.download_button("📥 Descargar Imagen", f, f"{formato}_RAH.jpg", "image/jpeg")
     else:
-        st.error("Sube al menos la foto principal.")
+        st.error("¡Por favor, sube al menos la foto de fachada principal!")
